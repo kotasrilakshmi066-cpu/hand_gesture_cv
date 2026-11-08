@@ -716,8 +716,34 @@ class VirtualMouseApp:
 def main():
     """Application bootstrap function."""
     root = tk.Tk()
-    app = VirtualMouseApp(root)
+    app_instance = VirtualMouseApp(root)
     root.mainloop()
+
+
+# =============================================================================
+# Vercel Serverless & Cloud Web Hosting Entrypoint
+# Allows repository to deploy cleanly on Vercel as an interactive web showcase
+# while preserving full native Tkinter desktop functionality when run locally.
+# =============================================================================
+import os
+
+def app(environ, start_response):
+    """WSGI application entrypoint for Vercel and cloud platforms."""
+    status = '200 OK'
+    headers = [('Content-type', 'text/html; charset=utf-8')]
+    start_response(status, headers)
+    html_path = os.path.join(os.path.dirname(__file__), "index.html")
+    if not os.path.exists(html_path):
+        html_path = os.path.join(os.path.dirname(__file__), "..", "index.html")
+    try:
+        with open(html_path, "r", encoding="utf-8") as f:
+            content = f.read()
+    except Exception:
+        content = "<html><body><h1>Hand Gesture Virtual Mouse</h1><p>Please run locally via python main.py or run.bat for webcam mouse control.</p></body></html>"
+    return [content.encode('utf-8')]
+
+application = app
+handler = app
 
 
 if __name__ == "__main__":
