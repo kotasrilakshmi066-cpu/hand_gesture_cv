@@ -9,8 +9,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Segoe+UI:wght@400;600;700&family=Consolas&display=swap" rel="stylesheet">
 
-  <!-- MediaPipe Hands & Camera Utils CDN -->
-  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
+  <!-- MediaPipe Hands CDN -->
   <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js" crossorigin="anonymous"></script>
 
   <style>
@@ -40,7 +39,7 @@
       user-select: none;
     }
 
-    /* Top Window Bar (Matches Desktop Window Header) */
+    /* Top Window Bar */
     .window-header {
       background: #141724;
       border-bottom: 1px solid var(--border-color);
@@ -109,10 +108,8 @@
 
     #webcam-video {
       position: absolute;
-      width: 100%;
-      height: 100%;
-      object-fit: cover;
-      transform: scaleX(-1); /* Horizontal Mirror */
+      width: 1px;
+      height: 1px;
       opacity: 0;
       pointer-events: none;
     }
@@ -122,7 +119,6 @@
       width: 100%;
       height: 100%;
       object-fit: cover;
-      transform: scaleX(-1); /* Match mirror */
     }
 
     .placeholder-overlay {
@@ -306,37 +302,37 @@
     .guide-name { color: var(--accent-cyan); font-weight: 600; width: 140px; }
     .guide-desc { color: var(--text-secondary); flex: 1; }
 
-    /* On-Screen Virtual Cursor for Web Browser Simulation */
+    /* On-Screen Virtual Cursor */
     #virtual-mouse-cursor {
       position: fixed;
-      width: 22px;
-      height: 22px;
+      width: 24px;
+      height: 24px;
       border: 2px solid var(--accent-cyan);
       border-radius: 50%;
-      background: rgba(0, 229, 255, 0.3);
+      background: rgba(0, 229, 255, 0.4);
       pointer-events: none;
       z-index: 99999;
       transform: translate(-50%, -50%);
       transition: width 0.1s, height 0.1s, background 0.1s;
       display: none;
-      box-shadow: 0 0 12px rgba(0, 229, 255, 0.8);
+      box-shadow: 0 0 16px rgba(0, 229, 255, 0.9);
     }
     #virtual-mouse-cursor.clicking {
-      background: rgba(0, 230, 118, 0.7);
+      background: rgba(0, 230, 118, 0.8);
       border-color: #00e676;
-      width: 30px;
-      height: 30px;
-      box-shadow: 0 0 20px #00e676;
+      width: 32px;
+      height: 32px;
+      box-shadow: 0 0 24px #00e676;
     }
     #virtual-mouse-cursor.right-clicking {
-      background: rgba(255, 51, 102, 0.7);
+      background: rgba(255, 51, 102, 0.8);
       border-color: #ff3366;
-      width: 30px;
-      height: 30px;
-      box-shadow: 0 0 20px #ff3366;
+      width: 32px;
+      height: 32px;
+      box-shadow: 0 0 24px #ff3366;
     }
 
-    /* Ripple Animation for Clicks */
+    /* Click Ripple Effect */
     .click-ripple {
       position: fixed;
       border: 3px solid #00e676;
@@ -372,7 +368,7 @@
     <!-- Left Panel: Video Viewport -->
     <div class="viewport-panel">
       <div class="video-container" id="video-container">
-        <video id="webcam-video" playsinline></video>
+        <video id="webcam-video" playsinline muted></video>
         <canvas id="output-canvas"></canvas>
         <div class="placeholder-overlay" id="placeholder-overlay">
           Camera feed offline.<br><br>
@@ -484,10 +480,21 @@
   </div>
 
   <script>
+    // 21 Landmark Connections
+    const HAND_CONNECTIONS = [
+      [0, 1], [1, 2], [2, 3], [3, 4],          // Thumb
+      [0, 5], [5, 6], [6, 7], [7, 8],          // Index
+      [5, 9], [9, 10], [10, 11], [11, 12],     // Middle
+      [9, 13], [13, 14], [14, 15], [15, 16],   // Ring
+      [13, 17], [17, 18], [18, 19], [19, 20],  // Pinky
+      [0, 17]                                  // Wrist-Pinky Palm Base
+    ];
+
     // State Variables
     let isCameraRunning = false;
     let isMouseEnabled = false;
-    let cameraInstance = null;
+    let isProcessingFrame = false;
+    let mediaStream = null;
     let handsInstance = null;
 
     let sensitivity = 1.2;
@@ -554,7 +561,7 @@
       gestureBadge.style.background = 'var(--accent-emergency)';
     }
 
-    // MediaPipe Hands Initialization
+    // MediaPipe Hands Initialization with Web-optimized settings
     function initMediaPipe() {
       handsInstance = new Hands({
         locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`
@@ -562,21 +569,19 @@
 
       handsInstance.setOptions({
         maxNumHands: 1,
-        modelComplexity: 1,
-        minDetectionConfidence: 0.7,
-        minTrackingConfidence: 0.6
+        modelComplexity: 0, // 0 is ultra-fast & responsive in browser
+        minDetectionConfidence: 0.5,
+        minTrackingConfidence: 0.5
       });
 
       handsInstance.onResults(onHandResults);
     }
 
-    let mediaStream = null;
-
     async function startCamera() {
       if (isCameraRunning) return;
 
       placeholder.style.display = 'none';
-      hudStatus.textContent = 'REQUESTING CAMERA PERMISSION...';
+      hudStatus.textContent = 'CONNECTING CAMERA...';
       hudStatus.style.color = 'var(--accent-amber)';
 
       if (!handsInstance) {
@@ -584,12 +589,11 @@
       }
 
       try {
-        // Direct native browser webcam access via WebRTC
         mediaStream = await navigator.mediaDevices.getUserMedia({
           video: {
             width: { ideal: 640 },
             height: { ideal: 480 },
-            facingMode: "user"
+            facingMode: 'user'
           },
           audio: false
         });
@@ -607,32 +611,35 @@
         hudStatus.textContent = isMouseEnabled ? 'MOUSE CONTROL ACTIVE' : 'CAMERA ONLINE';
         hudStatus.style.color = 'var(--accent-green)';
 
-        // Start high-performance frame processing loop
+        // Start processing loop
         requestAnimationFrame(processWebcamFrame);
 
       } catch (err) {
         console.error("Camera access error:", err);
         placeholder.style.display = 'block';
         placeholder.innerHTML = `
-          <span style="color:#ff3366; font-weight: bold;">Camera Access Blocked or Not Found</span><br><br>
-          1. Check the camera icon 🎥 in your browser's address bar and set to <strong>"Allow"</strong>.<br>
-          2. Ensure no other application (Teams, Zoom, Discord) is currently using your webcam.<br>
-          3. Click 'Start Camera' to try again.
+          <span style="color:#ff3366; font-weight: bold;">Camera Access Blocked</span><br><br>
+          Please click the 🎥 camera icon in your browser address bar and select <strong>"Always Allow"</strong>.
         `;
-        hudStatus.textContent = 'PERMISSION REQUIRED';
+        hudStatus.textContent = 'PERMISSION BLOCKED';
         hudStatus.style.color = 'var(--accent-red)';
       }
     }
 
     async function processWebcamFrame() {
       if (!isCameraRunning) return;
-      if (videoElement.readyState >= 2 && handsInstance) {
+
+      if (!isProcessingFrame && videoElement.readyState >= 2 && handsInstance) {
+        isProcessingFrame = true;
         try {
           await handsInstance.send({ image: videoElement });
         } catch (e) {
-          console.warn("Frame processing tick:", e);
+          console.warn("MediaPipe tick:", e);
+        } finally {
+          isProcessingFrame = false;
         }
       }
+
       if (isCameraRunning) {
         requestAnimationFrame(processWebcamFrame);
       }
@@ -654,7 +661,6 @@
       btnStop.style.opacity = '0.5';
       btnStop.style.cursor = 'not-allowed';
 
-      // Clear canvas
       canvasCtx.clearRect(0, 0, canvasElement.width, canvasElement.height);
       placeholder.style.display = 'block';
       placeholder.innerHTML = `Camera feed offline.<br><br>Click <strong>'Start Camera'</strong> below to launch the video stream.`;
@@ -668,14 +674,12 @@
       virtualCursor.style.display = 'none';
     }
 
-    // Mathematical Euclidean Distance
     function dist(p1, p2, w, h) {
       return Math.hypot((p2.x - p1.x) * w, (p2.y - p1.y) * h);
     }
 
     // Process Hand Landmarks Results
     function onHandResults(results) {
-      // Calculate FPS
       const now = performance.now();
       frameCount++;
       if (now - lastFrameTime >= 500) {
@@ -685,48 +689,63 @@
         lastFrameTime = now;
       }
 
-      canvasElement.width = videoElement.videoWidth || 640;
-      canvasElement.height = videoElement.videoHeight || 480;
-      const w = canvasElement.width;
-      const h = canvasElement.height;
+      const w = videoElement.videoWidth || 640;
+      const h = videoElement.videoHeight || 480;
+      canvasElement.width = w;
+      canvasElement.height = h;
 
       canvasCtx.save();
-      canvasCtx.clearRect(0, 0, w, h);
+      // Draw mirrored video frame so movement feels natural
+      canvasCtx.translate(w, 0);
+      canvasCtx.scale(-1, 1);
       canvasCtx.drawImage(results.image, 0, 0, w, h);
 
       const drawLandmarks = document.getElementById('chk-landmarks').checked;
       const drawROI = document.getElementById('chk-roi').checked;
 
-      // Active Zone ROI Box
+      // Active ROI Box
       const roiX = 100, roiY = 80;
       const roiW = w - 200, roiH = h - 160;
 
       if (drawROI) {
         canvasCtx.strokeStyle = '#0070f3';
-        canvasCtx.lineWidth = 2;
+        canvasCtx.lineWidth = 3;
         canvasCtx.strokeRect(roiX, roiY, roiW, roiH);
-
-        canvasCtx.fillStyle = '#0070f3';
-        canvasCtx.font = '14px Segoe UI';
-        canvasCtx.fillText('Active Interaction Zone', roiX + 10, roiY + 22);
       }
 
+      // Check if hand is detected
       if (results.multiHandLandmarks && results.multiHandLandmarks.length > 0) {
         const lms = results.multiHandLandmarks[0];
 
-        // Draw Skeleton Landmarks
+        // Draw custom skeleton connectors and landmark joints
         if (drawLandmarks) {
-          drawConnectors(canvasCtx, lms, HAND_CONNECTIONS, { color: '#ff6432', lineWidth: 2 });
-          drawLandmarksPoints(canvasCtx, lms, { color: '#00e5ff', radius: 4 });
+          // Connectors
+          canvasCtx.strokeStyle = '#ff6432';
+          canvasCtx.lineWidth = 3;
+          for (const conn of HAND_CONNECTIONS) {
+            const p1 = lms[conn[0]];
+            const p2 = lms[conn[1]];
+            canvasCtx.beginPath();
+            canvasCtx.moveTo(p1.x * w, p1.y * h);
+            canvasCtx.lineTo(p2.x * w, p2.y * h);
+            canvasCtx.stroke();
+          }
+
+          // Joints
+          canvasCtx.fillStyle = '#00e5ff';
+          for (let i = 0; i < lms.length; i++) {
+            const pt = lms[i];
+            canvasCtx.beginPath();
+            canvasCtx.arc(pt.x * w, pt.y * h, (i === 4 || i === 8 || i === 12) ? 6 : 4, 0, 2 * Math.PI);
+            canvasCtx.fill();
+          }
         }
 
-        // Fingers Up Detection [Thumb, Index, Middle, Ring, Pinky]
-        // 4: Thumb, 8: Index, 12: Middle, 16: Ring, 20: Pinky
+        // Fingers state [Thumb, Index, Middle, Ring, Pinky]
         const fingers = [0, 0, 0, 0, 0];
-        // Thumb (distance check)
-        const dTipPinky = Math.hypot((lms[4].x - lms[17].x) * w, (lms[4].y - lms[17].y) * h);
+        const dThumbPinky = Math.hypot((lms[4].x - lms[17].x) * w, (lms[4].y - lms[17].y) * h);
         const dIpPinky = Math.hypot((lms[3].x - lms[17].x) * w, (lms[3].y - lms[17].y) * h);
-        if (dTipPinky > dIpPinky * 1.05) fingers[0] = 1;
+        if (dThumbPinky > dIpPinky * 1.05) fingers[0] = 1;
 
         if (lms[8].y < lms[6].y) fingers[1] = 1;   // Index up
         if (lms[12].y < lms[10].y) fingers[2] = 1; // Middle up
@@ -735,27 +754,25 @@
 
         teleFingers.textContent = `[${fingers.join(', ')}]`;
 
-        // Distances for Gestures
+        // Distances
         const dThumbIndex = dist(lms[4], lms[8], w, h);
         const dThumbMiddle = dist(lms[4], lms[12], w, h);
         const dIndexMiddle = dist(lms[8], lms[12], w, h);
 
-        // Normalized Index tip position mapped to screen
-        // Note: Canvas is mirrored scaleX(-1), so x is inverted
-        const rawCamX = (1.0 - lms[8].x) * w;
-        const rawCamY = lms[8].y * h;
+        // Natural Mirrored Hand Position
+        const handX = (1.0 - lms[8].x) * w;
+        const handY = lms[8].y * h;
 
-        // Map from Active ROI to Full Browser Window
-        const mappedX = ((rawCamX - roiX) / roiW) * window.innerWidth;
-        const mappedY = ((rawCamY - roiY) / roiH) * window.innerHeight;
+        // Map Active ROI to Screen
+        const mappedX = ((handX - roiX) / roiW) * window.innerWidth;
+        const mappedY = ((handY - roiY) / roiH) * window.innerHeight;
 
-        // Sensitivity scaling around center
         const screenCenterX = window.innerWidth / 2;
         const screenCenterY = window.innerHeight / 2;
         const targetX = screenCenterX + (mappedX - screenCenterX) * sensitivity;
         const targetY = screenCenterY + (mappedY - screenCenterY) * sensitivity;
 
-        // Exponential Moving Average Smoothing
+        // Exponential Smoothing
         const currX = prevCursorX + (targetX - prevCursorX) / smoothing;
         const currY = prevCursorY + (targetY - prevCursorY) / smoothing;
 
@@ -764,11 +781,11 @@
 
         teleCursor.textContent = `X: ${Math.round(currX)} | Y: ${Math.round(currY)}`;
 
-        // Gesture Decision Tree
+        // Gesture Recognition
         let gestureText = "IDLE";
         let gestureColor = "var(--text-secondary)";
 
-        // 1. Left Click (Thumb + Index Pinch)
+        // Left Click: Thumb + Index Pinch
         if (dThumbIndex < 35) {
           gestureText = "LEFT CLICK";
           gestureColor = "var(--accent-green)";
@@ -777,14 +794,13 @@
           if (now - lastLeftClickTime > CLICK_COOLDOWN) {
             lastLeftClickTime = now;
             createClickRipple(currX, currY);
-            // Simulate browser click
             if (isMouseEnabled) {
               const el = document.elementFromPoint(currX, currY);
               if (el && typeof el.click === 'function') el.click();
             }
           }
         }
-        // 2. Right Click (Thumb + Middle Pinch)
+        // Right Click: Thumb + Middle Pinch
         else if (dThumbMiddle < 38 && dThumbIndex >= 35) {
           gestureText = "RIGHT CLICK";
           gestureColor = "var(--accent-emergency)";
@@ -795,7 +811,7 @@
             createClickRipple(currX, currY, '#ff3366');
           }
         }
-        // 3. Scroll (Two Fingers Up)
+        // Scroll: Two fingers up
         else if (fingers[1] === 1 && fingers[2] === 1 && fingers[3] === 0 && fingers[4] === 0 && dIndexMiddle < 45) {
           gestureText = "SCROLLING";
           gestureColor = "var(--accent-amber)";
@@ -810,14 +826,14 @@
           }
           prevScrollY = avgY;
         }
-        // 4. Moving Cursor (Index finger extended alone)
+        // Moving Cursor: Index finger alone
         else if (fingers[1] === 1 && fingers[2] === 0 && fingers[3] === 0) {
           gestureText = "MOVING CURSOR";
           gestureColor = "var(--accent-green)";
           virtualCursor.className = '';
           prevScrollY = null;
         }
-        // 5. Neutral Idle
+        // Neutral Idle
         else {
           gestureText = "NEUTRAL (IDLE)";
           gestureColor = "var(--text-secondary)";
@@ -825,7 +841,6 @@
           prevScrollY = null;
         }
 
-        // Update virtual cursor position on web page
         if (isMouseEnabled) {
           virtualCursor.style.left = `${Math.min(window.innerWidth - 10, Math.max(10, currX))}px`;
           virtualCursor.style.top = `${Math.min(window.innerHeight - 10, Math.max(10, currY))}px`;
@@ -833,25 +848,21 @@
 
         gestureBadge.textContent = gestureText;
         gestureBadge.style.color = gestureColor;
-        gestureBadge.style.background = 'var(--bg-card-alt)';
 
       } else {
-        // No hand detected
         gestureBadge.textContent = "NO HAND DETECTED";
         gestureBadge.style.color = "var(--accent-amber)";
         teleFingers.textContent = "[0, 0, 0, 0, 0]";
+        virtualCursor.className = '';
       }
 
       canvasCtx.restore();
-    }
 
-    // Helper to draw landmarks
-    function drawLandmarksPoints(ctx, landmarks, style) {
-      for (const lm of landmarks) {
-        ctx.beginPath();
-        ctx.arc(lm.x * canvasElement.width, lm.y * canvasElement.height, style.radius, 0, 2 * Math.PI);
-        ctx.fillStyle = style.color;
-        ctx.fill();
+      // Render text in NORMAL forward orientation
+      if (drawROI) {
+        canvasCtx.fillStyle = '#00e5ff';
+        canvasCtx.font = 'bold 15px Segoe UI';
+        canvasCtx.fillText('Active Interaction Zone', roiX + 10, roiY + 24);
       }
     }
 
