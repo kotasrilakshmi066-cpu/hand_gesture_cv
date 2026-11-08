@@ -78,6 +78,9 @@ class VirtualMouseApp:
         self._setup_styles()
         self._build_ui()
 
+        # Automatically start the camera stream upon launch
+        self.root.after(400, self.start_camera)
+
         # Handle window closure gracefully
         self.root.protocol("WM_DELETE_WINDOW", self.on_closing)
 
@@ -471,17 +474,36 @@ class VirtualMouseApp:
             return
 
         try:
-            # Open primary camera device with DirectShow backend on Windows for fast init
-            self.cap = cv2.VideoCapture(self.camera_device_index, cv2.CAP_DSHOW)
-            if not self.cap or not self.cap.isOpened():
-                # Fallback to default backend
-                self.cap = cv2.VideoCapture(self.camera_device_index)
+            # Multi-index and multi-backend webcam detector
+            opened = False
+            for idx in [self.camera_device_index, 0, 1, 2]:
+                for backend in [cv2.CAP_DSHOW, None]:
+                    try:
+                        if backend is not None:
+                            self.cap = cv2.VideoCapture(idx, backend)
+                        else:
+                            self.cap = cv2.VideoCapture(idx)
+                        if self.cap and self.cap.isOpened():
+                            ret, test_frame = self.cap.read()
+                            if ret and test_frame is not None:
+                                self.camera_device_index = idx
+                                opened = True
+                                break
+                            else:
+                                self.cap.release()
+                    except Exception:
+                        pass
+                if opened:
+                    break
 
-            if not self.cap.isOpened():
+            if not opened or not self.cap or not self.cap.isOpened():
                 messagebox.showerror(
                     "Camera Error",
-                    f"Unable to access webcam at index {self.camera_device_index}.\n"
-                    "Please verify that your webcam is connected, not occupied by another app, and camera permissions are granted."
+                    "Unable to access webcam.\n\n"
+                    "Please verify:\n"
+                    "1. Another app (Teams, Zoom, browser) is not currently locking the webcam.\n"
+                    "2. Windows Camera Privacy Settings allow desktop apps to access the camera.\n"
+                    "3. Your webcam is plugged in."
                 )
                 self.cap = None
                 return

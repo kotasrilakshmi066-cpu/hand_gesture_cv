@@ -570,11 +570,13 @@
       handsInstance.onResults(onHandResults);
     }
 
+    let mediaStream = null;
+
     async function startCamera() {
       if (isCameraRunning) return;
 
       placeholder.style.display = 'none';
-      hudStatus.textContent = 'STARTING CAMERA...';
+      hudStatus.textContent = 'REQUESTING CAMERA PERMISSION...';
       hudStatus.style.color = 'var(--accent-amber)';
 
       if (!handsInstance) {
@@ -582,17 +584,18 @@
       }
 
       try {
-        cameraInstance = new Camera(videoElement, {
-          onFrame: async () => {
-            if (isCameraRunning) {
-              await handsInstance.send({ image: videoElement });
-            }
+        // Direct native browser webcam access via WebRTC
+        mediaStream = await navigator.mediaDevices.getUserMedia({
+          video: {
+            width: { ideal: 640 },
+            height: { ideal: 480 },
+            facingMode: "user"
           },
-          width: 640,
-          height: 480
+          audio: false
         });
 
-        await cameraInstance.start();
+        videoElement.srcObject = mediaStream;
+        await videoElement.play();
 
         isCameraRunning = true;
         btnStart.style.opacity = '0.5';
@@ -604,23 +607,47 @@
         hudStatus.textContent = isMouseEnabled ? 'MOUSE CONTROL ACTIVE' : 'CAMERA ONLINE';
         hudStatus.style.color = 'var(--accent-green)';
 
+        // Start high-performance frame processing loop
+        requestAnimationFrame(processWebcamFrame);
+
       } catch (err) {
         console.error("Camera access error:", err);
         placeholder.style.display = 'block';
-        placeholder.innerHTML = `<span style="color:#ff3366">Camera Permission Denied or Unavailable.</span><br><br>Please allow webcam permissions in your browser.`;
-        hudStatus.textContent = 'ERROR';
+        placeholder.innerHTML = `
+          <span style="color:#ff3366; font-weight: bold;">Camera Access Blocked or Not Found</span><br><br>
+          1. Check the camera icon 🎥 in your browser's address bar and set to <strong>"Allow"</strong>.<br>
+          2. Ensure no other application (Teams, Zoom, Discord) is currently using your webcam.<br>
+          3. Click 'Start Camera' to try again.
+        `;
+        hudStatus.textContent = 'PERMISSION REQUIRED';
         hudStatus.style.color = 'var(--accent-red)';
+      }
+    }
+
+    async function processWebcamFrame() {
+      if (!isCameraRunning) return;
+      if (videoElement.readyState >= 2 && handsInstance) {
+        try {
+          await handsInstance.send({ image: videoElement });
+        } catch (e) {
+          console.warn("Frame processing tick:", e);
+        }
+      }
+      if (isCameraRunning) {
+        requestAnimationFrame(processWebcamFrame);
       }
     }
 
     function stopCamera() {
       if (!isCameraRunning) return;
 
-      if (cameraInstance) {
-        cameraInstance.stop();
-      }
-
       isCameraRunning = false;
+      if (mediaStream) {
+        mediaStream.getTracks().forEach(track => track.stop());
+        mediaStream = null;
+      }
+      videoElement.srcObject = null;
+
       btnStart.style.opacity = '1';
       btnStart.style.cursor = 'pointer';
       btnStop.classList.remove('active');
