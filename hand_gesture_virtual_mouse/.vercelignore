@@ -1,0 +1,10 @@
+# Files to ignore during Vercel Cloud Web Deployment
+# (Prevents Vercel from trying to install 550MB+ OpenCV/MediaPipe into cloud serverless functions)
+
+requirements.txt
+hand_gesture_virtual_mouse/requirements.txt
+.venv/
+*.pyc
+__pycache__/
+test_suite.py
+hand_gesture_virtual_mouse/test_suite.py
