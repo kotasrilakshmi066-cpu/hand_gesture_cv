@@ -3,313 +3,840 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Hand Gesture Controlled Virtual Mouse | Computer Vision Project</title>
+  <title>Hand Gesture Controlled Virtual Mouse - CV Project</title>
+  <!-- Google Fonts -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Segoe+UI:wght@400;600;700&family=Consolas&display=swap" rel="stylesheet">
+
+  <!-- MediaPipe Hands & Camera Utils CDN -->
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js" crossorigin="anonymous"></script>
+
   <style>
     :root {
-      --bg-dark: #0a0b10;
-      --bg-card: #141724;
-      --bg-card-hover: #1b1f32;
+      --bg-dark: #0f111a;
+      --bg-card: #1a1d2b;
+      --bg-card-alt: #222638;
       --accent-cyan: #00e5ff;
-      --accent-purple: #7c4dff;
-      --accent-green: #00e676;
-      --accent-red: #ff3366;
+      --accent-green: #00c853;
+      --accent-red: #d50000;
+      --accent-emergency: #ff3366;
+      --accent-amber: #ffb300;
       --text-primary: #ffffff;
-      --text-secondary: #94a3b8;
-      --border-color: #232942;
+      --text-secondary: #9eabc0;
+      --border-color: #2c324b;
     }
+
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body {
-      font-family: 'Inter', -apple-system, sans-serif;
-      background: var(--bg-dark);
+      background-color: var(--bg-dark);
       color: var(--text-primary);
-      line-height: 1.6;
+      font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, sans-serif;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
       overflow-x: hidden;
+      user-select: none;
     }
-    header {
-      background: rgba(20, 23, 36, 0.8);
-      backdrop-filter: blur(12px);
+
+    /* Top Window Bar (Matches Desktop Window Header) */
+    .window-header {
+      background: #141724;
       border-bottom: 1px solid var(--border-color);
-      position: sticky;
-      top: 0;
-      z-index: 100;
-      padding: 16px 24px;
+      padding: 14px 24px;
       display: flex;
       justify-content: space-between;
       align-items: center;
     }
-    .logo {
-      font-weight: 800;
-      font-size: 1.25rem;
-      background: linear-gradient(135deg, var(--accent-cyan), var(--accent-purple));
-      -webkit-background-clip: text;
-      -webkit-text-fill-color: transparent;
+    .window-title-box h1 {
+      font-size: 1.45rem;
+      font-weight: 700;
+      letter-spacing: 0.5px;
+      color: #ffffff;
+      margin-bottom: 3px;
     }
-    .badge {
-      background: rgba(0, 229, 255, 0.1);
+    .window-title-box p {
+      font-size: 0.85rem;
+      color: var(--text-secondary);
+    }
+    .badge-academic {
+      background: var(--bg-card-alt);
       color: var(--accent-cyan);
-      border: 1px solid rgba(0, 229, 255, 0.3);
-      padding: 4px 12px;
-      border-radius: 9999px;
-      font-size: 0.8rem;
-      font-family: 'JetBrains Mono', monospace;
-      font-weight: 600;
+      border: 1px solid var(--border-color);
+      padding: 6px 14px;
+      border-radius: 4px;
+      font-family: 'Consolas', monospace;
+      font-size: 0.85rem;
+      font-weight: 700;
+      letter-spacing: 1px;
     }
-    .hero {
-      text-align: center;
-      padding: 80px 20px 60px;
-      max-width: 900px;
+
+    /* Main Dashboard Layout */
+    .dashboard-container {
+      display: flex;
+      flex: 1;
+      padding: 16px 20px;
+      gap: 16px;
+      max-width: 1400px;
+      width: 100%;
       margin: 0 auto;
     }
-    .hero h1 {
-      font-size: 3rem;
-      font-weight: 800;
-      line-height: 1.2;
-      margin-bottom: 20px;
-      background: linear-gradient(180deg, #ffffff 0%, #cbd5e1 100%);
-      -webkit-background-clip: text;
-      -webkit-text-fill-color: transparent;
-    }
-    .hero p {
-      font-size: 1.2rem;
-      color: var(--text-secondary);
-      margin-bottom: 36px;
-    }
-    .btn-group {
+
+    /* Left Panel: Camera Viewport */
+    .viewport-panel {
+      flex: 1;
       display: flex;
-      gap: 16px;
-      justify-content: center;
-      flex-wrap: wrap;
-    }
-    .btn {
-      padding: 12px 28px;
-      border-radius: 8px;
-      font-weight: 600;
-      text-decoration: none;
-      display: inline-flex;
-      align-items: center;
-      gap: 8px;
-      transition: all 0.2s;
-      cursor: pointer;
-    }
-    .btn-primary {
-      background: var(--accent-cyan);
-      color: #000;
-    }
-    .btn-primary:hover {
-      box-shadow: 0 0 24px rgba(0, 229, 255, 0.4);
-      transform: translateY(-2px);
-    }
-    .btn-secondary {
+      flex-direction: column;
       background: var(--bg-card);
-      color: var(--text-primary);
+      border-radius: 8px;
+      padding: 12px;
       border: 1px solid var(--border-color);
     }
-    .btn-secondary:hover {
-      background: var(--bg-card-hover);
-      transform: translateY(-2px);
+
+    .video-container {
+      position: relative;
+      flex: 1;
+      min-height: 480px;
+      background: #000000;
+      border: 1px solid #000;
+      border-radius: 4px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      overflow: hidden;
     }
-    .container {
-      max-width: 1100px;
-      margin: 0 auto;
-      padding: 40px 20px;
+
+    #webcam-video {
+      position: absolute;
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      transform: scaleX(-1); /* Horizontal Mirror */
+      opacity: 0;
+      pointer-events: none;
     }
-    .grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-      gap: 24px;
-      margin-top: 32px;
+
+    #output-canvas {
+      position: absolute;
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      transform: scaleX(-1); /* Match mirror */
     }
+
+    .placeholder-overlay {
+      position: absolute;
+      text-align: center;
+      color: var(--text-secondary);
+      font-size: 1.1rem;
+      line-height: 1.8;
+      z-index: 5;
+    }
+
+    /* Video HUD Bar */
+    .video-hud-bar {
+      margin-top: 10px;
+      background: var(--bg-card-alt);
+      padding: 8px 14px;
+      border-radius: 4px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-family: 'Consolas', monospace;
+      font-size: 0.85rem;
+    }
+    .hud-fps { color: var(--accent-cyan); font-weight: 700; }
+    .hud-res { color: var(--text-secondary); }
+    .hud-status { color: var(--accent-red); font-weight: 700; }
+
+    /* Right Panel: Controls & Telemetry */
+    .controls-panel {
+      width: 380px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
     .card {
       background: var(--bg-card);
       border: 1px solid var(--border-color);
-      border-radius: 12px;
-      padding: 24px;
-      transition: all 0.2s;
+      border-radius: 8px;
+      padding: 14px 16px;
     }
-    .card:hover {
-      border-color: rgba(0, 229, 255, 0.4);
-      transform: translateY(-4px);
-    }
-    .card-icon {
-      font-size: 2rem;
-      margin-bottom: 16px;
-    }
-    .card h3 {
-      font-size: 1.25rem;
-      margin-bottom: 8px;
-      color: var(--text-primary);
-    }
-    .card p {
-      color: var(--text-secondary);
+
+    .card-title {
+      color: var(--accent-cyan);
       font-size: 0.95rem;
-    }
-    .section-title {
-      font-size: 2rem;
       font-weight: 700;
-      text-align: center;
+      letter-spacing: 0.5px;
+      margin-bottom: 12px;
+      text-transform: uppercase;
+    }
+
+    /* Buttons */
+    .btn-row {
+      display: flex;
+      gap: 10px;
       margin-bottom: 12px;
     }
-    .section-sub {
-      text-align: center;
-      color: var(--text-secondary);
-      margin-bottom: 40px;
+    .btn {
+      flex: 1;
+      padding: 10px 12px;
+      border: none;
+      border-radius: 4px;
+      font-size: 0.95rem;
+      font-weight: 700;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      transition: background 0.2s, transform 0.1s;
+      color: #ffffff;
     }
-    .terminal {
-      background: #0f121d;
-      border: 1px solid var(--border-color);
-      border-radius: 8px;
-      padding: 20px;
-      font-family: 'JetBrains Mono', monospace;
-      font-size: 0.9rem;
-      color: #a5b4fc;
-      overflow-x: auto;
-      margin: 24px 0;
-    }
-    .terminal-line { margin-bottom: 8px; }
-    .terminal-prompt { color: var(--accent-green); }
-    .table-container {
-      overflow-x: auto;
-      margin-top: 24px;
-    }
-    table {
+    .btn:active { transform: scale(0.98); }
+    .btn-start { background: var(--accent-green); }
+    .btn-start:hover { background: #00e676; }
+    .btn-stop { background: var(--accent-red); opacity: 0.5; cursor: not-allowed; }
+    .btn-stop.active { opacity: 1; cursor: pointer; }
+    .btn-emergency {
       width: 100%;
-      border-collapse: collapse;
-      text-align: left;
+      background: var(--accent-emergency);
+      color: #ffffff;
+      padding: 10px;
+      margin-top: 10px;
     }
-    th, td {
-      padding: 14px 18px;
-      border-bottom: 1px solid var(--border-color);
+    .btn-emergency:hover { background: #ff1744; }
+
+    /* Checkbox */
+    .checkbox-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 0.95rem;
+      font-weight: 600;
+      cursor: pointer;
+      margin-top: 4px;
     }
-    th {
-      background: var(--bg-card);
+    .checkbox-row input {
+      accent-color: var(--accent-cyan);
+      width: 17px;
+      height: 17px;
+      cursor: pointer;
+    }
+
+    /* Telemetry Display */
+    .gesture-badge {
+      background: var(--bg-card-alt);
+      border: 1px solid var(--border-color);
+      border-radius: 4px;
+      padding: 10px;
+      text-align: center;
+      font-size: 1.15rem;
+      font-weight: 700;
+      letter-spacing: 1px;
+      color: var(--text-secondary);
+      margin-bottom: 12px;
+    }
+
+    .telemetry-row {
+      display: flex;
+      justify-content: space-between;
+      font-size: 0.85rem;
+      margin-bottom: 6px;
+    }
+    .tele-label { color: var(--text-secondary); }
+    .tele-val {
+      font-family: 'Consolas', monospace;
+      font-weight: 700;
       color: var(--accent-cyan);
+    }
+
+    /* Tuning Sliders */
+    .slider-group {
+      margin-bottom: 12px;
+    }
+    .slider-header {
+      display: flex;
+      justify-content: space-between;
+      font-size: 0.85rem;
+      margin-bottom: 4px;
       font-weight: 600;
     }
-    footer {
-      text-align: center;
-      padding: 40px 20px;
+    .slider-val {
+      font-family: 'Consolas', monospace;
+      color: var(--accent-cyan);
+    }
+    input[type=range] {
+      width: 100%;
+      height: 6px;
+      accent-color: var(--accent-cyan);
+      background: #2a3148;
+      border-radius: 3px;
+      outline: none;
+      cursor: pointer;
+    }
+
+    .tuning-checkboxes {
+      display: flex;
+      justify-content: space-between;
+      font-size: 0.8rem;
       color: var(--text-secondary);
-      border-top: 1px solid var(--border-color);
-      margin-top: 80px;
+      margin-top: 8px;
+    }
+    .tuning-checkboxes label {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      cursor: pointer;
+    }
+
+    /* Gesture Guide List */
+    .guide-list {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      font-size: 0.82rem;
+    }
+    .guide-item {
+      display: flex;
+      justify-content: space-between;
+    }
+    .guide-name { color: var(--accent-cyan); font-weight: 600; width: 140px; }
+    .guide-desc { color: var(--text-secondary); flex: 1; }
+
+    /* On-Screen Virtual Cursor for Web Browser Simulation */
+    #virtual-mouse-cursor {
+      position: fixed;
+      width: 22px;
+      height: 22px;
+      border: 2px solid var(--accent-cyan);
+      border-radius: 50%;
+      background: rgba(0, 229, 255, 0.3);
+      pointer-events: none;
+      z-index: 99999;
+      transform: translate(-50%, -50%);
+      transition: width 0.1s, height 0.1s, background 0.1s;
+      display: none;
+      box-shadow: 0 0 12px rgba(0, 229, 255, 0.8);
+    }
+    #virtual-mouse-cursor.clicking {
+      background: rgba(0, 230, 118, 0.7);
+      border-color: #00e676;
+      width: 30px;
+      height: 30px;
+      box-shadow: 0 0 20px #00e676;
+    }
+    #virtual-mouse-cursor.right-clicking {
+      background: rgba(255, 51, 102, 0.7);
+      border-color: #ff3366;
+      width: 30px;
+      height: 30px;
+      box-shadow: 0 0 20px #ff3366;
+    }
+
+    /* Ripple Animation for Clicks */
+    .click-ripple {
+      position: fixed;
+      border: 3px solid #00e676;
+      border-radius: 50%;
+      pointer-events: none;
+      z-index: 99998;
+      animation: ripple 0.4s ease-out forwards;
+      transform: translate(-50%, -50%);
+    }
+    @keyframes ripple {
+      0% { width: 10px; height: 10px; opacity: 1; }
+      100% { width: 60px; height: 60px; opacity: 0; }
     }
   </style>
 </head>
 <body>
-  <header>
-    <div class="logo">VirtualMouse.CV</div>
-    <div class="badge">Academic CV Project v1.0</div>
+
+  <!-- Virtual Mouse Pointer Element -->
+  <div id="virtual-mouse-cursor"></div>
+
+  <!-- Window Header -->
+  <header class="window-header">
+    <div class="window-title-box">
+      <h1>HAND GESTURE CONTROLLED VIRTUAL MOUSE</h1>
+      <p>Real-Time Computer Vision HCI System | MediaPipe Hands + OpenCV + PyAutoGUI</p>
+    </div>
+    <div class="badge-academic">ACADEMIC PROJECT v1.0</div>
   </header>
 
-  <main>
-    <section class="hero">
-      <h1>Hand Gesture Controlled Virtual Mouse</h1>
-      <p>A real-time Computer Vision Human-Computer Interface (HCI) leveraging Google MediaPipe Hands, OpenCV, and PyAutoGUI to control computer cursors via contactless hand movements.</p>
-      <div class="btn-group">
-        <a href="https://github.com/kotasrilakshmi066-cpu/hand_gesture_cv" class="btn btn-primary" target="_blank">View GitHub Repository</a>
-        <a href="#quickstart" class="btn btn-secondary">Local Execution Guide</a>
-      </div>
-    </section>
+  <!-- Main Dashboard Container -->
+  <div class="dashboard-container">
 
-    <div class="container">
-      <h2 class="section-title">Core Gesture Controls</h2>
-      <p class="section-sub">Geometric classification based on Euclidean distance across 21 hand landmarks</p>
-
-      <div class="grid">
-        <div class="card">
-          <div class="card-icon">☝️</div>
-          <h3>Cursor Navigation</h3>
-          <p>Index fingertip (Landmark 8) controls screen position with Exponential Moving Average (EMA) smoothing and noise deadband suppression.</p>
-        </div>
-        <div class="card">
-          <div class="card-icon">🤏</div>
-          <h3>Left Click</h3>
-          <p>Pinch gesture between Thumb Tip (4) and Index Tip (8) with Euclidean distance &lt; 35px. Fully debounced to prevent duplicate clicks.</p>
-        </div>
-        <div class="card">
-          <div class="card-icon">👌</div>
-          <h3>Right Click</h3>
-          <p>Pinch gesture between Thumb Tip (4) and Middle Tip (12) (&lt; 38px) while Index is extended away. Triggers context menus.</p>
-        </div>
-        <div class="card">
-          <div class="card-icon">✌️</div>
-          <h3>Dual-Finger Scroll</h3>
-          <p>Raise both Index and Middle fingers together. Moving hand vertically up or down scrolls documents and web pages fluidly.</p>
-        </div>
-        <div class="card">
-          <div class="card-icon">✋</div>
-          <h3>Neutral / Rest Mode</h3>
-          <p>Open hand palm or closed fist safely suspends all mouse action dispatches without halting the camera stream.</p>
-        </div>
-        <div class="card">
-          <div class="card-icon">🛑</div>
-          <h3>Safety Failsafe</h3>
-          <p>Moving cursor to any monitor corner or clicking Emergency Stop immediately aborts PyAutoGUI hardware dispatching.</p>
+    <!-- Left Panel: Video Viewport -->
+    <div class="viewport-panel">
+      <div class="video-container" id="video-container">
+        <video id="webcam-video" playsinline></video>
+        <canvas id="output-canvas"></canvas>
+        <div class="placeholder-overlay" id="placeholder-overlay">
+          Camera feed offline.<br><br>
+          Click <strong>'Start Camera'</strong> below to launch the video stream.
         </div>
       </div>
 
-      <div id="quickstart" style="margin-top: 80px;">
-        <h2 class="section-title">How to Run Locally on Your Laptop</h2>
-        <p class="section-sub">Because virtual mouse control requires direct access to your physical webcam and OS cursor, execute locally on Windows/macOS/Linux:</p>
-
-        <div class="terminal">
-          <div class="terminal-line"><span class="terminal-prompt"># 1. Clone the repository</span></div>
-          <div class="terminal-line">git clone https://github.com/kotasrilakshmi066-cpu/hand_gesture_cv.git</div>
-          <div class="terminal-line">cd hand_gesture_cv</div>
-          <br>
-          <div class="terminal-line"><span class="terminal-prompt"># 2. Install dependencies (Python 3.10 or 3.11 recommended)</span></div>
-          <div class="terminal-line">pip install -r hand_gesture_virtual_mouse/requirements.txt</div>
-          <br>
-          <div class="terminal-line"><span class="terminal-prompt"># 3. Launch application</span></div>
-          <div class="terminal-line">run.bat</div>
-          <div class="terminal-line"><span class="terminal-prompt"># OR: python hand_gesture_virtual_mouse/main.py</span></div>
-        </div>
-      </div>
-
-      <div style="margin-top: 80px;">
-        <h2 class="section-title">Academic Team Division</h2>
-        <div class="table-container">
-          <table>
-            <thead>
-              <tr>
-                <th>Team Member</th>
-                <th>Role</th>
-                <th>Core Responsibilities</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr>
-                <td><strong>Member 1</strong></td>
-                <td>Hand Detection Specialist</td>
-                <td>OpenCV video capture loop, MediaPipe Hands 21-landmark extraction, Euclidean distance calculations.</td>
-              </tr>
-              <tr>
-                <td><strong>Member 2</strong></td>
-                <td>Gesture Recognition Engineer</td>
-                <td>Geometric classification rules, finger extension status, pinch separation logic, directional scrolling.</td>
-              </tr>
-              <tr>
-                <td><strong>Member 3</strong></td>
-                <td>Mouse Controller Specialist</td>
-                <td>PyAutoGUI integration, screen coordinate mapping, EMA smoothing filter, click debouncing & failsafes.</td>
-              </tr>
-              <tr>
-                <td><strong>Member 4</strong></td>
-                <td>UI & Integration Lead</td>
-                <td>Tkinter dark dashboard, in-feed video HUD overlays, test suite verification, and technical documentation.</td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
+      <div class="video-hud-bar">
+        <div class="hud-fps" id="hud-fps">FPS: --</div>
+        <div class="hud-res">Resolution: 640x480</div>
+        <div class="hud-status" id="hud-status">CAMERA OFFLINE</div>
       </div>
     </div>
-  </main>
 
-  <footer>
-    <p>Academic Computer Vision Project | Built with OpenCV, MediaPipe & PyAutoGUI</p>
-    <p style="margin-top: 8px; font-size: 0.85rem;">Source Code on <a href="https://github.com/kotasrilakshmi066-cpu/hand_gesture_cv" style="color: var(--accent-cyan); text-decoration: none;" target="_blank">GitHub</a></p>
-  </footer>
+    <!-- Right Panel: Controls & Telemetry -->
+    <div class="controls-panel">
+
+      <!-- Card 1: System Controls -->
+      <div class="card">
+        <div class="card-title">System Controls</div>
+        <div class="btn-row">
+          <button class="btn btn-start" id="btn-start" onclick="startCamera()">▶ Start Camera</button>
+          <button class="btn btn-stop" id="btn-stop" onclick="stopCamera()">⏹ Stop Camera</button>
+        </div>
+
+        <label class="checkbox-row">
+          <input type="checkbox" id="chk-mouse-control" onchange="toggleMouseControl()">
+          Enable Virtual Mouse Control
+        </label>
+
+        <button class="btn btn-emergency" onclick="emergencyStop()">⚠ EMERGENCY STOP (Disable Mouse)</button>
+      </div>
+
+      <!-- Card 2: Live Telemetry -->
+      <div class="card">
+        <div class="card-title">Live Recognition Telemetry</div>
+        <div class="gesture-badge" id="gesture-badge">STANDBY</div>
+
+        <div class="telemetry-row">
+          <span class="tele-label">Screen Cursor Target:</span>
+          <span class="tele-val" id="tele-cursor">X: 0 | Y: 0</span>
+        </div>
+        <div class="telemetry-row">
+          <span class="tele-label">Fingers State [T,I,M,R,P]:</span>
+          <span class="tele-val" id="tele-fingers">[0, 0, 0, 0, 0]</span>
+        </div>
+      </div>
+
+      <!-- Card 3: Tuning & Calibration -->
+      <div class="card">
+        <div class="card-title">Tuning & Calibration</div>
+
+        <div class="slider-group">
+          <div class="slider-header">
+            <span>Sensitivity Multiplier:</span>
+            <span class="slider-val" id="val-sensitivity">1.2x</span>
+          </div>
+          <input type="range" id="slider-sensitivity" min="0.5" max="2.5" step="0.1" value="1.2" oninput="updateSliders()">
+        </div>
+
+        <div class="slider-group">
+          <div class="slider-header">
+            <span>Cursor Smoothing Factor:</span>
+            <span class="slider-val" id="val-smoothing">5</span>
+          </div>
+          <input type="range" id="slider-smoothing" min="1" max="15" step="1" value="5" oninput="updateSliders()">
+        </div>
+
+        <div class="tuning-checkboxes">
+          <label>
+            <input type="checkbox" id="chk-landmarks" checked>
+            Skeleton Landmarks
+          </label>
+          <label>
+            <input type="checkbox" id="chk-roi" checked>
+            Active Zone Box
+          </label>
+        </div>
+      </div>
+
+      <!-- Card 4: Gesture Quick Reference -->
+      <div class="card">
+        <div class="card-title">Gesture Quick Reference</div>
+        <div class="guide-list">
+          <div class="guide-item">
+            <span class="guide-name">☝ Index Up</span>
+            <span class="guide-desc">Move cursor smoothly</span>
+          </div>
+          <div class="guide-item">
+            <span class="guide-name">🤏 Thumb + Index</span>
+            <span class="guide-desc">Trigger Left Click</span>
+          </div>
+          <div class="guide-item">
+            <span class="guide-name">👌 Thumb + Middle</span>
+            <span class="guide-desc">Trigger Right Click</span>
+          </div>
+          <div class="guide-item">
+            <span class="guide-name">✌ Two Fingers Up</span>
+            <span class="guide-desc">Scroll Up / Down</span>
+          </div>
+          <div class="guide-item">
+            <span class="guide-name">✋ Open Hand / Fist</span>
+            <span class="guide-desc">Neutral Idle (Rest)</span>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <script>
+    // State Variables
+    let isCameraRunning = false;
+    let isMouseEnabled = false;
+    let cameraInstance = null;
+    let handsInstance = null;
+
+    let sensitivity = 1.2;
+    let smoothing = 5.0;
+
+    let prevCursorX = window.innerWidth / 2;
+    let prevCursorY = window.innerHeight / 2;
+    let prevScrollY = null;
+
+    let lastLeftClickTime = 0;
+    let lastRightClickTime = 0;
+    const CLICK_COOLDOWN = 350; // ms
+
+    let lastFrameTime = performance.now();
+    let frameCount = 0;
+    let fps = 0;
+
+    const videoElement = document.getElementById('webcam-video');
+    const canvasElement = document.getElementById('output-canvas');
+    const canvasCtx = canvasElement.getContext('2d');
+    const virtualCursor = document.getElementById('virtual-mouse-cursor');
+    const placeholder = document.getElementById('placeholder-overlay');
+
+    // UI Elements
+    const btnStart = document.getElementById('btn-start');
+    const btnStop = document.getElementById('btn-stop');
+    const chkMouse = document.getElementById('chk-mouse-control');
+    const hudStatus = document.getElementById('hud-status');
+    const hudFps = document.getElementById('hud-fps');
+    const gestureBadge = document.getElementById('gesture-badge');
+    const teleCursor = document.getElementById('tele-cursor');
+    const teleFingers = document.getElementById('tele-fingers');
+    const valSensitivity = document.getElementById('val-sensitivity');
+    const valSmoothing = document.getElementById('val-smoothing');
+
+    function updateSliders() {
+      sensitivity = parseFloat(document.getElementById('slider-sensitivity').value);
+      smoothing = parseFloat(document.getElementById('slider-smoothing').value);
+      valSensitivity.textContent = sensitivity.toFixed(1) + 'x';
+      valSmoothing.textContent = smoothing.toFixed(0);
+    }
+
+    function toggleMouseControl() {
+      isMouseEnabled = chkMouse.checked;
+      if (isMouseEnabled) {
+        virtualCursor.style.display = 'block';
+        hudStatus.textContent = 'MOUSE CONTROL ACTIVE';
+        hudStatus.style.color = 'var(--accent-green)';
+      } else {
+        virtualCursor.style.display = 'none';
+        hudStatus.textContent = isCameraRunning ? 'CAMERA ONLINE' : 'CAMERA OFFLINE';
+        hudStatus.style.color = isCameraRunning ? 'var(--accent-green)' : 'var(--accent-red)';
+      }
+    }
+
+    function emergencyStop() {
+      chkMouse.checked = false;
+      isMouseEnabled = false;
+      virtualCursor.style.display = 'none';
+      hudStatus.textContent = 'EMERGENCY STOPPED';
+      hudStatus.style.color = 'var(--accent-emergency)';
+      gestureBadge.textContent = 'EMERGENCY STOP';
+      gestureBadge.style.color = '#ffffff';
+      gestureBadge.style.background = 'var(--accent-emergency)';
+    }
+
+    // MediaPipe Hands Initialization
+    function initMediaPipe() {
+      handsInstance = new Hands({
+        locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`
+      });
+
+      handsInstance.setOptions({
+        maxNumHands: 1,
+        modelComplexity: 1,
+        minDetectionConfidence: 0.7,
+        minTrackingConfidence: 0.6
+      });
+
+      handsInstance.onResults(onHandResults);
+    }
+
+    async function startCamera() {
+      if (isCameraRunning) return;
+
+      placeholder.style.display = 'none';
+      hudStatus.textContent = 'STARTING CAMERA...';
+      hudStatus.style.color = 'var(--accent-amber)';
+
+      if (!handsInstance) {
+        initMediaPipe();
+      }
+
+      try {
+        cameraInstance = new Camera(videoElement, {
+          onFrame: async () => {
+            if (isCameraRunning) {
+              await handsInstance.send({ image: videoElement });
+            }
+          },
+          width: 640,
+          height: 480
+        });
+
+        await cameraInstance.start();
+
+        isCameraRunning = true;
+        btnStart.style.opacity = '0.5';
+        btnStart.style.cursor = 'not-allowed';
+        btnStop.classList.add('active');
+        btnStop.style.opacity = '1';
+        btnStop.style.cursor = 'pointer';
+
+        hudStatus.textContent = isMouseEnabled ? 'MOUSE CONTROL ACTIVE' : 'CAMERA ONLINE';
+        hudStatus.style.color = 'var(--accent-green)';
+
+      } catch (err) {
+        console.error("Camera access error:", err);
+        placeholder.style.display = 'block';
+        placeholder.innerHTML = `<span style="color:#ff3366">Camera Permission Denied or Unavailable.</span><br><br>Please allow webcam permissions in your browser.`;
+        hudStatus.textContent = 'ERROR';
+        hudStatus.style.color = 'var(--accent-red)';
+      }
+    }
+
+    function stopCamera() {
+      if (!isCameraRunning) return;
+
+      if (cameraInstance) {
+        cameraInstance.stop();
+      }
+
+      isCameraRunning = false;
+      btnStart.style.opacity = '1';
+      btnStart.style.cursor = 'pointer';
+      btnStop.classList.remove('active');
+      btnStop.style.opacity = '0.5';
+      btnStop.style.cursor = 'not-allowed';
+
+      // Clear canvas
+      canvasCtx.clearRect(0, 0, canvasElement.width, canvasElement.height);
+      placeholder.style.display = 'block';
+      placeholder.innerHTML = `Camera feed offline.<br><br>Click <strong>'Start Camera'</strong> below to launch the video stream.`;
+
+      hudStatus.textContent = 'CAMERA OFFLINE';
+      hudStatus.style.color = 'var(--accent-red)';
+      hudFps.textContent = 'FPS: --';
+      gestureBadge.textContent = 'STANDBY';
+      gestureBadge.style.color = 'var(--text-secondary)';
+      gestureBadge.style.background = 'var(--bg-card-alt)';
+      virtualCursor.style.display = 'none';
+    }
+
+    // Mathematical Euclidean Distance
+    function dist(p1, p2, w, h) {
+      return Math.hypot((p2.x - p1.x) * w, (p2.y - p1.y) * h);
+    }
+
+    // Process Hand Landmarks Results
+    function onHandResults(results) {
+      // Calculate FPS
+      const now = performance.now();
+      frameCount++;
+      if (now - lastFrameTime >= 500) {
+        fps = Math.round((frameCount * 1000) / (now - lastFrameTime));
+        hudFps.textContent = `FPS: ${fps}`;
+        frameCount = 0;
+        lastFrameTime = now;
+      }
+
+      canvasElement.width = videoElement.videoWidth || 640;
+      canvasElement.height = videoElement.videoHeight || 480;
+      const w = canvasElement.width;
+      const h = canvasElement.height;
+
+      canvasCtx.save();
+      canvasCtx.clearRect(0, 0, w, h);
+      canvasCtx.drawImage(results.image, 0, 0, w, h);
+
+      const drawLandmarks = document.getElementById('chk-landmarks').checked;
+      const drawROI = document.getElementById('chk-roi').checked;
+
+      // Active Zone ROI Box
+      const roiX = 100, roiY = 80;
+      const roiW = w - 200, roiH = h - 160;
+
+      if (drawROI) {
+        canvasCtx.strokeStyle = '#0070f3';
+        canvasCtx.lineWidth = 2;
+        canvasCtx.strokeRect(roiX, roiY, roiW, roiH);
+
+        canvasCtx.fillStyle = '#0070f3';
+        canvasCtx.font = '14px Segoe UI';
+        canvasCtx.fillText('Active Interaction Zone', roiX + 10, roiY + 22);
+      }
+
+      if (results.multiHandLandmarks && results.multiHandLandmarks.length > 0) {
+        const lms = results.multiHandLandmarks[0];
+
+        // Draw Skeleton Landmarks
+        if (drawLandmarks) {
+          drawConnectors(canvasCtx, lms, HAND_CONNECTIONS, { color: '#ff6432', lineWidth: 2 });
+          drawLandmarksPoints(canvasCtx, lms, { color: '#00e5ff', radius: 4 });
+        }
+
+        // Fingers Up Detection [Thumb, Index, Middle, Ring, Pinky]
+        // 4: Thumb, 8: Index, 12: Middle, 16: Ring, 20: Pinky
+        const fingers = [0, 0, 0, 0, 0];
+        // Thumb (distance check)
+        const dTipPinky = Math.hypot((lms[4].x - lms[17].x) * w, (lms[4].y - lms[17].y) * h);
+        const dIpPinky = Math.hypot((lms[3].x - lms[17].x) * w, (lms[3].y - lms[17].y) * h);
+        if (dTipPinky > dIpPinky * 1.05) fingers[0] = 1;
+
+        if (lms[8].y < lms[6].y) fingers[1] = 1;   // Index up
+        if (lms[12].y < lms[10].y) fingers[2] = 1; // Middle up
+        if (lms[16].y < lms[14].y) fingers[3] = 1; // Ring up
+        if (lms[20].y < lms[18].y) fingers[4] = 1; // Pinky up
+
+        teleFingers.textContent = `[${fingers.join(', ')}]`;
+
+        // Distances for Gestures
+        const dThumbIndex = dist(lms[4], lms[8], w, h);
+        const dThumbMiddle = dist(lms[4], lms[12], w, h);
+        const dIndexMiddle = dist(lms[8], lms[12], w, h);
+
+        // Normalized Index tip position mapped to screen
+        // Note: Canvas is mirrored scaleX(-1), so x is inverted
+        const rawCamX = (1.0 - lms[8].x) * w;
+        const rawCamY = lms[8].y * h;
+
+        // Map from Active ROI to Full Browser Window
+        const mappedX = ((rawCamX - roiX) / roiW) * window.innerWidth;
+        const mappedY = ((rawCamY - roiY) / roiH) * window.innerHeight;
+
+        // Sensitivity scaling around center
+        const screenCenterX = window.innerWidth / 2;
+        const screenCenterY = window.innerHeight / 2;
+        const targetX = screenCenterX + (mappedX - screenCenterX) * sensitivity;
+        const targetY = screenCenterY + (mappedY - screenCenterY) * sensitivity;
+
+        // Exponential Moving Average Smoothing
+        const currX = prevCursorX + (targetX - prevCursorX) / smoothing;
+        const currY = prevCursorY + (targetY - prevCursorY) / smoothing;
+
+        prevCursorX = currX;
+        prevCursorY = currY;
+
+        teleCursor.textContent = `X: ${Math.round(currX)} | Y: ${Math.round(currY)}`;
+
+        // Gesture Decision Tree
+        let gestureText = "IDLE";
+        let gestureColor = "var(--text-secondary)";
+
+        // 1. Left Click (Thumb + Index Pinch)
+        if (dThumbIndex < 35) {
+          gestureText = "LEFT CLICK";
+          gestureColor = "var(--accent-green)";
+          virtualCursor.className = 'clicking';
+
+          if (now - lastLeftClickTime > CLICK_COOLDOWN) {
+            lastLeftClickTime = now;
+            createClickRipple(currX, currY);
+            // Simulate browser click
+            if (isMouseEnabled) {
+              const el = document.elementFromPoint(currX, currY);
+              if (el && typeof el.click === 'function') el.click();
+            }
+          }
+        }
+        // 2. Right Click (Thumb + Middle Pinch)
+        else if (dThumbMiddle < 38 && dThumbIndex >= 35) {
+          gestureText = "RIGHT CLICK";
+          gestureColor = "var(--accent-emergency)";
+          virtualCursor.className = 'right-clicking';
+
+          if (now - lastRightClickTime > 500) {
+            lastRightClickTime = now;
+            createClickRipple(currX, currY, '#ff3366');
+          }
+        }
+        // 3. Scroll (Two Fingers Up)
+        else if (fingers[1] === 1 && fingers[2] === 1 && fingers[3] === 0 && fingers[4] === 0 && dIndexMiddle < 45) {
+          gestureText = "SCROLLING";
+          gestureColor = "var(--accent-amber)";
+          virtualCursor.className = '';
+
+          const avgY = (lms[8].y + lms[12].y) / 2;
+          if (prevScrollY !== null) {
+            const delta = (prevScrollY - avgY) * 600;
+            if (isMouseEnabled && Math.abs(delta) > 5) {
+              window.scrollBy({ top: -delta, behavior: 'auto' });
+            }
+          }
+          prevScrollY = avgY;
+        }
+        // 4. Moving Cursor (Index finger extended alone)
+        else if (fingers[1] === 1 && fingers[2] === 0 && fingers[3] === 0) {
+          gestureText = "MOVING CURSOR";
+          gestureColor = "var(--accent-green)";
+          virtualCursor.className = '';
+          prevScrollY = null;
+        }
+        // 5. Neutral Idle
+        else {
+          gestureText = "NEUTRAL (IDLE)";
+          gestureColor = "var(--text-secondary)";
+          virtualCursor.className = '';
+          prevScrollY = null;
+        }
+
+        // Update virtual cursor position on web page
+        if (isMouseEnabled) {
+          virtualCursor.style.left = `${Math.min(window.innerWidth - 10, Math.max(10, currX))}px`;
+          virtualCursor.style.top = `${Math.min(window.innerHeight - 10, Math.max(10, currY))}px`;
+        }
+
+        gestureBadge.textContent = gestureText;
+        gestureBadge.style.color = gestureColor;
+        gestureBadge.style.background = 'var(--bg-card-alt)';
+
+      } else {
+        // No hand detected
+        gestureBadge.textContent = "NO HAND DETECTED";
+        gestureBadge.style.color = "var(--accent-amber)";
+        teleFingers.textContent = "[0, 0, 0, 0, 0]";
+      }
+
+      canvasCtx.restore();
+    }
+
+    // Helper to draw landmarks
+    function drawLandmarksPoints(ctx, landmarks, style) {
+      for (const lm of landmarks) {
+        ctx.beginPath();
+        ctx.arc(lm.x * canvasElement.width, lm.y * canvasElement.height, style.radius, 0, 2 * Math.PI);
+        ctx.fillStyle = style.color;
+        ctx.fill();
+      }
+    }
+
+    function createClickRipple(x, y, color = '#00e676') {
+      const ripple = document.createElement('div');
+      ripple.className = 'click-ripple';
+      ripple.style.left = `${x}px`;
+      ripple.style.top = `${y}px`;
+      ripple.style.borderColor = color;
+      document.body.appendChild(ripple);
+      setTimeout(() => ripple.remove(), 400);
+    }
+  </script>
 </body>
 </html>

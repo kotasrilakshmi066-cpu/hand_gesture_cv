@@ -8,3 +8,4 @@ hand_gesture_virtual_mouse/requirements.txt
 __pycache__/
 test_suite.py
 hand_gesture_virtual_mouse/test_suite.py
+
